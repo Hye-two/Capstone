@@ -27,7 +27,7 @@ load_dotenv()
 app = FastAPI(title="Gwangju Youth Policy AI API")
 
 # [2] Gemini Flash 모델 선언 (무료 tier 사용)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, max_retries=1)
 
 # 🌐 실시간 동적 상세 페이지 URL 탐색기 (Dynamic Realtime Resolver)
 import time
