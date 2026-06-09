@@ -63,13 +63,51 @@ def clean_category(raw_cat: str) -> str:
         return "복지/문화"
 
 
+OTHER_REGIONS = {
+    # 서울
+    "서울", "서울특별시", "종로", "용산", "성동", "광진", "동대문", "중랑", "성북", "강북", "도봉", "노원", "은평", "서대문", "마포", "양천", "강서", "구로", "금천", "영등포", "동작", "관악", "서초", "강남", "송파", "강동",
+    # 인천
+    "인천", "인천광역시", "미추홀", "연수", "남동", "부평", "계양", "강화", "옹진",
+    # 경기
+    "경기", "경기도", "수원", "성남", "의정부", "안양", "부천", "광명", "평택", "동두천", "안산", "고양", "과천", "구리", "남양주", "오산", "시흥", "군포", "의왕", "하남", "용인", "파주", "이천", "안성", "김포", "화성", "양주", "포천", "여주", "연천", "가평", "양평",
+    # 강원
+    "강원", "강원도", "춘천", "원주", "강릉", "동해", "태백", "속초", "삼척", "홍천", "횡성", "영월", "평창", "정선", "철원", "화천", "양구", "인제", "고성", "양양",
+    # 대전 / 세종 / 충북 / 충남
+    "대전", "대전광역시", "유성", "대덕", "세종", "세종특별자치시",
+    "충북", "충청북도", "청주", "충주", "제천", "보은", "옥천", "영동", "증평", "진천", "괴산", "음성", "단양",
+    "충남", "충청남도", "천안", "공주", "보령", "아산", "서산", "논산", "계룡", "당진", "금산", "부여", "서천", "청양", "홍성", "예산", "태안",
+    # 전북 / 전남 (광주 제외)
+    "전북", "전라북도", "전북특별자치도", "전주", "군산", "익산", "정읍", "남원", "김제", "완주", "진안", "장수", "임실", "순창", "고창", "부안",
+    "전남", "전라남도", "목포", "여수", "순천", "나주", "광양", "담양", "곡성", "구례", "고흥", "보성", "화순", "장흥", "강진", "해남", "영암", "무안", "함평", "영광", "장성", "완도", "진도", "신안",
+    # 부산 / 울산 / 대구
+    "부산", "부산광역시", "영도", "부산진", "동래", "해운대", "사하", "금정", "연제", "수영", "사상", "기장",
+    "대구", "대구광역시", "수성", "달서", "달성", "군위",
+    "울산", "울산광역시", "울주",
+    # 경북 / 경남
+    "경북", "경상북도", "포항", "경주", "김천", "안동", "구미", "영주", "영천", "상주", "문경", "경산", "의성", "청송", "영양", "영덕", "청도", "고령", "성주", "칠곡", "예천", "봉화", "울진", "울릉",
+    "경남", "경상남도", "창원", "진주", "통영", "사천", "김해", "밀양", "거제", "양산", "의령", "함안", "창녕", "남해", "하동", "산청", "함양", "거창", "합천",
+    # 제주
+    "제주", "제주도", "제주특별자치도", "서귀포"
+}
+
 def is_region_mismatched(policy_text: str, user_region: str) -> bool:
     """
     policy_text: 정책 제목 + 소관기관 + 본문 합친 텍스트
     user_region: 예) "광주광역시 북구"
     반환: True = 제외해야 함, False = 노출해야 함
     """
+    # ── 1. 타 지자체 키워드 기반 엄격 필터링 (제목/소관기관/본문 통합 검사) ──
+    for region in OTHER_REGIONS:
+        # 접미사가 붙은 형태 검사 (예: "창녕군", "성북구", "천안시", "전북도")
+        for suffix in ["시", "군", "구", "도", "광역시", "특별자치시", "도민", "시민", "군민"]:
+            if (region + suffix) in policy_text:
+                return True
+        # 광역/기초 지자체명 단독 매칭 (2글자 이상)
+        if len(region) >= 2:
+            if region in policy_text:
+                return True
 
+    # ── 2. 기존 광역시/도 및 구/군 얼라이언스 정밀 체크 ──
     # 광역시/도 추출 (예: "광주광역시 북구" -> "광주")
     sido_aliases = {
         "서울": ["서울"],
@@ -99,7 +137,6 @@ def is_region_mismatched(policy_text: str, user_region: str) -> bool:
                  "도봉구", "노원구", "은평구", "서대문구", "마포구", "양천구",
                  "구로구", "금천구", "영등포구", "동작구", "관악구", "서초구",
                  "송파구", "강동구"],
-        # 필요 시 다른 도시 구 목록 추가
     }
 
     # 사용자 광역 키 파악
@@ -997,11 +1034,11 @@ async def match_policies(p: UserRequestModel):
             if policy_name and policy_name not in unique_policies:
                 unique_policies[policy_name] = doc
                 
-        # 매칭 추천 결과 개수가 풍부하도록 최대 10개까지 로컬 추천 생성
-        candidate_names = list(unique_policies.keys())[:10]
-        
-        for name in candidate_names:
-            doc = unique_policies[name]
+        # 매칭 추천 결과 개수가 풍부하도록 최대 10개까지 로컬 추천 생성 (지역 및 특수사항 필터링 적용)
+        for name, doc in unique_policies.items():
+            if len(fallback_policies) >= 10:
+                break
+                
             clean_name = re.sub(r"^\([^)]+\)\s*", "", name).strip()
             file_name = policy_file_map.get(name) or policy_file_map.get(clean_name)
             
@@ -1009,6 +1046,21 @@ async def match_policies(p: UserRequestModel):
             if file_name:
                 details = extract_ground_truth_policy_details(file_name)
             
+            # 검사 텍스트 구성 (제목 + 소관기관 + 본문)
+            policy_text = name + " " + details.get('agency', '') + " " + (details.get('condition_text') or details.get('eligibility', doc.page_content))
+            
+            # 1. 지역 필터 적용
+            if is_region_mismatched(policy_text, p.region):
+                continue
+                
+            # 2. 특수조건 필터 적용 (장애인, 특수교육 등 사용자가 선택하지 않은 키워드 일치 시 차단)
+            if is_special_mismatched(policy_text, p.special):
+                continue
+                
+            # 3. 마감 기한 정밀 체크
+            if is_policy_expired(details.get('end_date', 'unknown')):
+                continue
+                
             # 카테고리 판정 및 유저 관심사 일치 시 높은 매칭률 부여
             policy_interest = details.get("interest", clean_category(doc.metadata.get("category", "주거")))
             is_preferred = (policy_interest == p.interest)
