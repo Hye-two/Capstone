@@ -263,6 +263,11 @@ function App() {
     }
   }, []);
 
+  // 🚀 메뉴 전환 시 페이지 최상단으로 자동 스크롤 이동
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeMenu]);
+
   // 1. 로그인한 사용자의 데이터 로드
   const loadUserData = async (user) => {
     try {

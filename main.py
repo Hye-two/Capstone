@@ -5,6 +5,8 @@ import asyncio
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -822,8 +824,25 @@ class MatchResultModel(BaseModel):
     policies: List[PolicyResponseModel]
     filtered_out: List[FilteredOutPolicyModel]  # 조건 불가로 탈락된 정책 (나이/마감 제외)
 
+# Gemini가 실제로 출력할 압축된 구조화 모델 (출력 토큰 단축 및 잘림 방지)
+class LLMPolicyResponseModel(BaseModel):
+    policy_name: str
+    reason: str
+    match_rate: int
+    region: str
+    education: str
+    job: str
+    housing: str
+    housingDetail: str
+    income: str
+    special: List[str]
+
+class LLMMatchResultModel(BaseModel):
+    policies: List[LLMPolicyResponseModel]
+    filtered_out: List[FilteredOutPolicyModel]
+
 # Pydantic 모델로 구조화된 출력 강제
-structured_llm = llm.with_structured_output(MatchResultModel)
+structured_llm = llm.with_structured_output(LLMMatchResultModel)
 
 # [3] 로컬 ChromaDB 설정 (embed_policies.py와 동일한 모델 사용 필수!)
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
@@ -874,8 +893,8 @@ async def match_policies(p: UserRequestModel):
     # 또한 사용자가 광주에 거주하더라도 '전국' 단위 정책도 조회되어야 하므로 핵심 조건 위주로 검색어를 구성합니다.
     search_terms = f"{p.region} 전국 {p.education} {p.job} {p.housing} {p.housingDetail} {p.income} {' '.join(p.special)}"
 
-    # ChromaDB에서 관련 정책 후보 80개 대량 검색 (Gemini 2.5 Flash는 대용량 컨텍스트 처리가 가능함)
-    relevant_docs = vectorstore.similarity_search(search_terms, k=80)
+    # ChromaDB에서 관련 정책 후보 200개 대량 검색 (Gemini 2.5 Flash는 대용량 컨텍스트 처리가 가능함)
+    relevant_docs = vectorstore.similarity_search(search_terms, k=200)
     
     # 💡 [1차 필터링 - RAG 단계] 마감된 정책의 청크는 프롬프트 컨텍스트에서 아예 배제
     active_docs = []
@@ -905,7 +924,7 @@ async def match_policies(p: UserRequestModel):
         if not is_expired:
             active_docs.append(doc)
             
-    print(f"[RAG Filter] Excluded {len(relevant_docs) - len(active_docs)} chunks belonging to expired policies: {list(excluded_titles)}")
+    print(f"[RAG Filter] Excluded {len(relevant_docs) - len(active_docs)} chunks belonging to expired policies ({len(excluded_titles)} unique policies)")
     context = "\n\n".join([doc.page_content for doc in active_docs])
 
     # 2. 프롬프트 엔지니어링
@@ -929,7 +948,7 @@ async def match_policies(p: UserRequestModel):
     {context}
     
     [미션 및 출력 규칙]
-    1. 참고 공고문 중에서 사용자의 조건과 조금이라도 부합하는 정책들을 최대한 누락 없이 골라 매칭하세요. 결과 개수가 너무 적지 않도록 자격 요건이 충족되면 적극적으로 포함하여 최소 8~12개 내외의 풍부한 정책 리스트를 반환하세요.
+    1. 참고 공고문 중에서 사용자의 조건과 조금이라도 부합하는 정책들을 최대한 누락 없이 골라 매칭하세요. 결과 개수가 너무 적지 않도록 자격 요건이 조금이라도 부합하면 적극적으로 포함하여 최소 25~35개의 정책 리스트를 반환하세요. 조건이 완벽히 맞는 정책은 match_rate를 80 이상으로, 조건이 일부 맞는 정책은 match_rate를 50~79로 설정하세요.
     1-2. 중요 (지역 조건 불일치의 엄격한 필터링):
          - 사용자의 거주 지역(지역: {p.region}, 예: "광주광역시 북구", "광주광역시 전체")과 참고 공고문의 대상 지역, 지원 지역, 또는 소관 기관(예: "인천광역시 관내", "인천도시공사", "부산시 수영구" 등)을 반드시 정밀 대조하십시오.
          - 만약 공고문 텍스트 내에 특정 타 지자체 제한(예: 인천, 대구, 부산, 경기도 등 사용자의 지역과 다른 광역/기초 자치단체)이 명시되어 있는 정책이라면, 이는 사용자 자격 조건에 부합하지 않으므로 추천 목록(policies)에서 **무조건 완전히 제외**하고, 필터링 탈락 목록(filtered_out)에 반드시 포함시키십시오. (탈락 사유 예: "지역 제한 불일치: 인천광역시 청년만 지원 가능")
@@ -1040,7 +1059,6 @@ async def match_policies(p: UserRequestModel):
         # 1. 환각 방지를 위한 타이틀 정밀 매핑 (SequenceMatcher 활용)
         best_match, ratio = find_best_policy_title_match(name)
         if best_match and ratio >= 0.50:
-            policy.policy_name = best_match
             name = best_match
         else:
             print(f"[Post-LLM Alignment] Discarded completely hallucinated policy: '{name}' (Max similarity ratio: {ratio:.2f})")
@@ -1051,17 +1069,7 @@ async def match_policies(p: UserRequestModel):
         details = {}
         if file_name:
             details = extract_ground_truth_policy_details(file_name)
-            if details:
-                policy.policy_name = details.get('policy_name', name)
-                policy.interest    = details.get('interest', policy.interest)
-                policy.agency      = details.get('agency', policy.agency)
-                policy.apply_method       = details.get('apply_method', policy.apply_method)
-                policy.required_documents = details.get('required_documents', policy.required_documents)
-                policy.end_date    = details.get('end_date', policy.end_date)
-                policy.eligibility = details.get('eligibility', policy.eligibility)
-                if details.get('apply_link') and details.get('apply_link') != 'unknown':
-                    policy.apply_link = details['apply_link']
-
+            
         # ── 검사 텍스트 구성 ──
         policy_text = details.get('condition_text') or (name + " " + details.get('agency', '') + " " + details.get('eligibility', ''))
         special_check_text = policy_text  # 동일 텍스트 재사용
@@ -1076,30 +1084,50 @@ async def match_policies(p: UserRequestModel):
             print(f"[Post-LLM Filter] 특수조건 불일치 제외: '{name}'")
             continue
         
-        # 3. 카테고리(interest) 정보 강제 검증/클렌징
-        policy.interest = clean_category(policy.interest)
-        
-        # 4. 마감 기한 정밀 체크
-        if is_policy_expired(policy.end_date):
-            print(f"[Post-LLM Filter] Excluded recommended expired policy: '{name}' (deadline: {policy.end_date})")
+        # 마감 기한 정밀 체크
+        end_date_val = details.get('end_date', 'unknown')
+        if is_policy_expired(end_date_val):
+            print(f"[Post-LLM Filter] Excluded recommended expired policy: '{name}' (deadline: {end_date_val})")
             continue
             
         cached_apply_link, cached_detail_link = get_cached_policy_links(name)
         
-        # 5) 일반 신청링크 복원/주입 (우선적으로 캐시나 txt 파일에서 정밀 복원)
+        # 일반 신청링크 복원
+        apply_link_val = details.get('apply_link', 'unknown')
         if cached_apply_link != "unknown":
-            policy.apply_link = cached_apply_link
-        elif policy.apply_link == "unknown" or not policy.apply_link.startswith("http"):
+            apply_link_val = cached_apply_link
+        elif apply_link_val == "unknown" or not apply_link_val.startswith("http"):
             if cached_detail_link != "unknown":
-                policy.apply_link = cached_detail_link
+                apply_link_val = cached_detail_link
                 
-        # 6) 상세 신청링크 복원/주입
+        # 상세 신청링크 복원
+        detail_link_val = "unknown"
         if cached_detail_link != "unknown":
-            policy.detail_link = cached_detail_link
-        else:
-            policy.detail_link = "unknown"
+            detail_link_val = cached_detail_link
             
-        active_policies.append(policy)
+        # 3. PolicyResponseModel 구축
+        p_model = PolicyResponseModel(
+            policy_name=details.get('policy_name', name),
+            apply_link=apply_link_val,
+            detail_link=detail_link_val,
+            apply_method=details.get('apply_method', '정보 없음'),
+            reason=policy.reason,
+            eligibility=details.get('eligibility', '본문 내용 참고'),
+            region=policy.region,
+            education=policy.education,
+            job=policy.job,
+            housing=policy.housing,
+            housingDetail=policy.housingDetail,
+            income=policy.income,
+            interest=clean_category(details.get('interest', '복지/문화')),
+            special=policy.special,
+            required_documents=details.get('required_documents', []),
+            end_date=end_date_val,
+            match_rate=policy.match_rate,
+            agency=details.get('agency', '정보 없음')
+        )
+        
+        active_policies.append(p_model)
         
     active_filtered_out = []
     for f_policy in result.filtered_out:
