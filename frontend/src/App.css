@@ -1,0 +1,278 @@
+/* App.css - Premium custom styles for Auth Screen, Tabs, and Layout modifications */
+
+/* Login/Register Screen */
+.login-overlay {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: linear-gradient(135deg, #09090b 0%, #1e1b4b 40%, #311042 100%);
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 450px;
+  padding: 40px;
+  box-sizing: border-box;
+  text-align: center;
+  border-radius: 24px;
+}
+
+.login-header {
+  margin-bottom: 30px;
+}
+
+.login-header h2 {
+  font-size: 32px;
+  margin: 10px 0 5px 0;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.login-header p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.auth-tabs {
+  display: flex;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 25px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.auth-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: var(--font-family);
+}
+
+.auth-tab-btn.active {
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(168, 85, 247, 0.2);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+}
+
+.auth-form input[type="text"],
+.auth-form input[type="password"] {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--font-family);
+  transition: all 0.3s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.auth-form input[type="text"]:focus,
+.auth-form input[type="password"]:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.auth-error-msg {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.auth-success-msg {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+/* Top Navigation Bar */
+.top-nav-menu {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 40px;
+  background: rgba(30, 41, 59, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border);
+  padding: 8px 12px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.nav-menu-btn {
+  background: none;
+  border: none;
+  padding: 10px 20px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: var(--font-family);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-menu-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.nav-menu-btn.active {
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+}
+
+.logout-btn {
+  margin-left: auto;
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Customized Layout Structures */
+.dashboard-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  width: 100%;
+}
+
+.documents-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .documents-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-layout {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.profile-layout .form-panel {
+  width: 100%;
+  max-width: 600px;
+}
+
+/* Card Button Group Simple (2-column layout) */
+.status-btn-group-simple {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Bold rationale keyword highlight */
+.highlighted-keyword {
+  color: #e9d5ff;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+}
+
+.pre-wrap-text {
+  white-space: pre-wrap !important;
+  line-height: 1.6 !important;
+}
+
+/* Profile Info inside Header */
+.profile-greeting {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 5px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-greeting strong {
+  color: #c084fc;
+}
+
+/* Document Upload Panel styles */
+.document-upload-panel {
+  grid-column: 1 / -1;
+}
+
+.file-select-label {
+  transition: all 0.25s ease;
+}
+
+.file-select-label:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--accent-color) !important;
+  color: var(--text-primary);
+}
+
+.upload-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.uploaded-file-item {
+  transition: all 0.2s ease;
+}
+
+.uploaded-file-item:hover {
+  background: rgba(15, 23, 42, 0.45) !important;
+  border-color: rgba(168, 85, 247, 0.2) !important;
+}
+
